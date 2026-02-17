@@ -1,15 +1,19 @@
 import { pgTable,pgEnum, serial, text, timestamp, varchar } from "drizzle-orm/pg-core"
 import { userAgent } from "next/server"
+ 
 export const userSystemEnum = pgEnum("user_system_enum", ["user", "system"])
+
 
 export const chats = pgTable ("chats", {
     id : serial("id").primaryKey( ),
     pdfName : text("pdf_name").notNull(),
-    pdfUrl : text("pdf_url").notNull(),
+    pdfUrl : text("pdf_url").notNull(), 
     createdAt : timestamp("created_at").defaultNow().notNull(),
     userId : varchar("user_id", {length : 256}).notNull(),
     fileKey : text("file_key").notNull()
 });
+
+export type DrizzleChat = typeof chats.$inferSelect;
 
 export const messages = pgTable("messages", {
     id : serial("id").primaryKey(),

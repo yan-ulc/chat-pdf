@@ -42,7 +42,7 @@ export async function uploadToS3(
             file_name: file.name
         })
 
-    } catch(error){
+    } catch(error){ 
         console.error("Error configuring AWS:", error);
     }
 }

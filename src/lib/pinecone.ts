@@ -1,22 +1,94 @@
-import { Pinecone, PineconeRecord } from "@pinecone-database/pinecone";
-import { downloadFromS3 } from "./s3-server";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
+import { downloadFromS3 } from "./s3-server";
+import { Document } from "@langchain/core/documents";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { embedLocal } from "./embed-local";
+import { index } from "./pinecone-index";
+import { convertToAscii } from "./utils"; 
+import md5 from "md5"
 
-export const pinecone = new Pinecone({
-  apiKey: process.env.NEXT_PUBLIC_PINECONE_API_KEY!,
-});
+export type PDFPage = {
+  pageContent: string;
+  metadata: {   
+    loc: { pageNumber: number };
+    pageNumber: number;
+  };
+};
 
-export const index = pinecone.index(process.env.PINECONE_INDEX_NAME!);
+export async function loadS3IntoPinecone(filekey: string) {
+  console.log("Downloading:", filekey);
+
+  const buffer = await downloadFromS3(filekey);
+  if (!buffer) throw new Error("Failed to download from S3");
+
+  const blob = new Blob([new Uint8Array(buffer)], {
+    type: "application/pdf",
+  });
+
+  const loader = new PDFLoader(blob, { splitPages: true });
+  const pages = (await loader.load()) as PDFPage[];
+
+  console.log("PDF pages:", pages.length);
+
+  const docsNested = await Promise.all(pages.map(prepareDocuments));
+  const docs = docsNested.flat();
+
+  console.log("Total chunks:", docs.length);
+
+  await embedAndUpsert(docs);
+
+  return docs;
+}
+
+export async function embedAndUpsert(docs: Document[]) {
+  console.log("Embedding + upserting...");
+
+  const vectors = [];
+
+  for (let i = 0; i < docs.length; i++) {
+    const doc = docs[i];
+    const embedding = await embedLocal(doc.pageContent);
+    console.log("Embedding vector for chunk", i, ":", embedding);
+
+    const hash = md5(convertToAscii(doc.pageContent));
 
 
-export async function loadS3IntoPinecone(filekey : string ) {
-    // obtain the pdf -> download and read form s3
-    console.log("downloading file from S3 into Pinecone:", filekey);
-    const file_name = await downloadFromS3(filekey);
-    if (!file_name) {
-        throw new Error ("Failed to download file from S3");
-    }
-    const loader = new PDFLoader(file_name!);
-    const pages = await loader.load();
-    return pages 
-}   
+    vectors.push({
+      id: hash,
+      values: embedding,
+      metadata: {
+        text: doc.pageContent,
+        pageNumber: doc.metadata?.pageNumber,
+      },
+    });
+  }
+
+  await index.upsert(vectors);
+
+  console.log("Upsert done:", vectors.length, "vectors");
+}
+
+export async function prepareDocuments(page: PDFPage) {
+  let { pageContent, metadata } = page;
+
+  if (!pageContent) return [];
+
+  pageContent = pageContent.replace(/\n/g, " ");
+
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 1000,
+    chunkOverlap: 200,
+  });
+
+  const docs = await splitter.splitDocuments([
+    new Document({
+      pageContent,
+      metadata: {
+        pageNumber: metadata.loc.pageNumber,
+        raw: pageContent,
+      },
+    }),
+  ]);
+  console.log("Prepared", docs.length, "chunks for page", metadata.loc.pageNumber);
+  return docs;
+}

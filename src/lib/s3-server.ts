@@ -1,31 +1,31 @@
-import AWS from "aws-sdk"
-import fs from "fs";
+// s3-server.ts
 
-export async function downloadFromS3(filekey: string){
+import AWS from "aws-sdk";
 
-    try {
-        AWS.config.update({
-            accessKeyId: process.env.NEXT_PUBLIC_S3_ACCESS_KEY_ID!,
-            secretAccessKey: process.env.NEXT_PUBLIC_S3_SECRET_ACCESS_KEY!,
-        })
+export async function downloadFromS3(filekey: string) {
+  try {
+    AWS.config.update({
+      accessKeyId: process.env.NEXT_PUBLIC_S3_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.NEXT_PUBLIC_S3_SECRET_ACCESS_KEY!,
+    });
 
-        const s3 = new AWS.S3({
-            params: {
-                Bucket: process.env.NEXT_PUBLIC_S3_BUCKET_NAME!,
-            },
-            region: process.env.NEXT_PUBLIC_S3_REGION!,
-        })
-        const params = {
-            Bucket: process.env.NEXT_PUBLIC_S3_BUCKET_NAME!,
-            Key: filekey,
-        }
-        const obj = await s3.getObject(params).promise();
-        const file_name = `tmp/pdf-${Date.now()}.pdf`
-        fs.writeFileSync(file_name, obj.Body as Buffer);
-        return file_name;
-    } catch (error) {
-        console.error("Error downloading from S3:", error);
-        return null
-        
-    }
-} 
+    const s3 = new AWS.S3({
+      params: { Bucket: process.env.NEXT_PUBLIC_S3_BUCKET_NAME! },
+      region: process.env.NEXT_PUBLIC_S3_REGION!,
+    });
+
+    const obj = await s3
+      .getObject({
+        Bucket: process.env.NEXT_PUBLIC_S3_BUCKET_NAME!,
+        Key: filekey,
+      })
+      .promise();
+
+    if (!obj.Body) throw new Error("Empty file from S3");
+
+    return obj.Body as Buffer;
+  } catch (err) {
+    console.error("Error downloading from S3:", err);
+    return null;
+  }
+}

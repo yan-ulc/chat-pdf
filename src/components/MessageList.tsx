@@ -1,14 +1,12 @@
-import react from "react"
-import { Message } from "ai/react";
-import { messages } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
+import { Message } from "ai/react";
 
 type Props = {
-  message: Message[]
+  message: Message[];
 };
 
 const MessageList = ({ message }: Props) => {
-  if (!messages) return <></>;
+  if (message.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-2 px-4">
@@ -21,17 +19,18 @@ const MessageList = ({ message }: Props) => {
               "justify-start pr-10": messaage.role === "assistant",
             })}
           >
-            <div className={
-                cn("rounded-xl px-3 text-sm  py-2 shadow-md ring-1 ring-gray-900/10",
+            <div
+              className={cn(
+                "rounded-xl px-3 text-sm  py-2 shadow-md ring-1 ring-gray-900/10",
                 {
                   "bg-purple-600 text-white": messaage.role === "assistant",
                   "bg-fuchsia-400 text-white": messaage.role === "user",
-                })
-            }> 
-            {messaage.content}
-
+                },
+              )}
+            >
+              {messaage.content}
             </div>
-          </div> 
+          </div>
         );
       })}
     </div>

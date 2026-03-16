@@ -1,15 +1,15 @@
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import { downloadFromS3 } from "./s3-server";
 import { Document } from "@langchain/core/documents";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import md5 from "md5";
 import { embedLocal } from "./embed-local";
 import { index } from "./pinecone-index";
-import { convertToAscii } from "./utils"; 
-import md5 from "md5"
+import { downloadFromS3 } from "./s3-server";
+import { convertToAscii } from "./utils";
 
 export type PDFPage = {
   pageContent: string;
-  metadata: {   
+  metadata: {
     loc: { pageNumber: number };
     pageNumber: number;
   };
@@ -52,7 +52,6 @@ export async function embedAndUpsert(docs: Document[]) {
 
     const hash = md5(convertToAscii(doc.pageContent));
 
-
     vectors.push({
       id: hash,
       values: embedding,
@@ -69,7 +68,8 @@ export async function embedAndUpsert(docs: Document[]) {
 }
 
 export async function prepareDocuments(page: PDFPage) {
-  let { pageContent, metadata } = page;
+  let { pageContent } = page;
+  const { metadata } = page;
 
   if (!pageContent) return [];
 
@@ -89,6 +89,11 @@ export async function prepareDocuments(page: PDFPage) {
       },
     }),
   ]);
-  console.log("Prepared", docs.length, "chunks for page", metadata.loc.pageNumber);
+  console.log(
+    "Prepared",
+    docs.length,
+    "chunks for page",
+    metadata.loc.pageNumber,
+  );
   return docs;
 }

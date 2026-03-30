@@ -1,4 +1,4 @@
-import { pipeline } from "@xenova/transformers";
+import { env, pipeline } from "@xenova/transformers";
 
 type EmbeddingOutput = {
   data: Iterable<number> | ArrayLike<number>;
@@ -13,6 +13,12 @@ type Embedder = (
 ) => Promise<EmbeddingOutput>;
 
 let embedder: Embedder | null = null;
+
+// Force serverless-safe execution on Vercel/Lambda (WASM + remote model fetch).
+env.allowLocalModels = false;
+env.allowRemoteModels = true;
+env.useBrowserCache = false;
+env.backends.onnx.wasm.numThreads = 1;
 
 export async function embedLocal(text: string) {
   if (!embedder) {
